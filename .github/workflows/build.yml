@@ -1,0 +1,44 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unzip project
+        run: |
+          ZIP=$(ls *.zip | head -n 1)
+          echo "Using $ZIP"
+          unzip -q "$ZIP" -d proj
+          PUB=$(find proj -name pubspec.yaml | head -n 1)
+          echo "PROJ=$(dirname "$PUB")" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.24.5
+          channel: stable
+          cache: true
+
+      - name: Prepare Android project, packages and icon
+        working-directory: ${{ env.PROJ }}
+        run: bash tool/setup.sh
+
+      - name: Build release APK
+        working-directory: ${{ env.PROJ }}
+        run: flutter build apk --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: waraqa-apk
+          path: ${{ env.PROJ }}/build/app/outputs/flutter-apk/app-release.apk
